@@ -1,0 +1,1 @@
+{"name":"myapp","version":"2.0.0","database":{"host":"prod-db.example.com","port":5432,"ssl":true},"features":["auth","logging","monitoring"],"timeout":30}
