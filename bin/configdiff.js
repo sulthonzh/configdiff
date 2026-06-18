@@ -2,8 +2,7 @@
 'use strict';
 
 const fs = require('fs');
-const path = require('path');
-const { compare, detectFormat, formatHuman, formatJSONOutput } = require('../lib/diff');
+const { compare, detectFormat, formatHuman, formatJSONOutput, VERSION } = require('../lib/diff');
 
 const args = process.argv.slice(2);
 
@@ -13,8 +12,9 @@ function usage() {
 Usage: configdiff <file-a> <file-b> [options]
 
 Options:
-  --json    Output as JSON
-  --help    Show this help
+  --json     Output as JSON
+  --version  Show version
+  --help     Show this help
 
 Supported formats: .json, .yaml/.yml, .toml
 
@@ -23,6 +23,11 @@ Examples:
   configdiff docker-compose.yml docker-compose.new.yml
   configdiff pyproject.toml pyproject.new.toml --json
 `);
+}
+
+if (args.includes('--version') || args.includes('-V')) {
+  console.log(VERSION);
+  process.exit(0);
 }
 
 if (args.includes('--help') || args.length < 2) {

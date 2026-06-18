@@ -1,6 +1,6 @@
 {
   "name": "configdiff",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Semantic diff for config files — JSON, YAML, TOML. See what actually changed, not just line noise.",
   "main": "lib/diff.js",
   "bin": {
@@ -8,13 +8,32 @@
   },
   "scripts": {
     "test": "node test/run.js",
-    "demo": "node bin/configdiff.js test/fixtures/a.json test/fixtures/b.json"
+    "demo": "node bin/configdiff.js test/fixtures/a.json test/fixtures/b.json",
+    "prepublishOnly": "npm test"
   },
-  "keywords": ["diff", "config", "json", "yaml", "toml", "semantic", "compare"],
+  "keywords": [
+    "diff",
+    "config",
+    "json",
+    "yaml",
+    "toml",
+    "semantic",
+    "compare",
+    "ci"
+  ],
   "author": "sulthonzh",
   "license": "MIT",
   "engines": {
     "node": ">=16"
   },
-  "files": ["lib/", "bin/", "README.md"]
+  "files": [
+    "lib/",
+    "bin/",
+    "README.md",
+    "CHANGELOG.md"
+  ],
+  "exports": {
+    ".": "./lib/diff.js",
+    "./package.json": "./package.json"
+  }
 }

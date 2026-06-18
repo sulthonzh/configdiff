@@ -1,8 +1,7 @@
 'use strict';
 
 const fs = require('fs');
-const path = require('path');
-const { parse, diff, compare, detectFormat, formatHuman, formatJSONOutput, parseYAML, parseTOML } = require('../lib/diff');
+const { parse, diff, compare, detectFormat, formatHuman, formatJSONOutput, formatPath, formatValue, parseYAML, parseTOML, VERSION } = require('../lib/diff');
 
 let passed = 0;
 let failed = 0;
@@ -60,6 +59,56 @@ tags:
   assertEqual(obj.tags, ['web', 'api'], 'yaml array');
 }
 
+// ── YAML Inline Flow Sequence (v1.1.0 bug fix) ───────
+console.log('YAML inline flow sequence');
+{
+  const yaml = 'tags: [a, b, c]';
+  const obj = parseYAML(yaml);
+  assertEqual(obj.tags, ['a', 'b', 'c'], 'yaml inline array unquoted');
+}
+{
+  const yaml = 'ports: [3000, 8080, 443]';
+  const obj = parseYAML(yaml);
+  assertEqual(obj.ports, [3000, 8080, 443], 'yaml inline array numbers');
+}
+{
+  const yaml = 'items: ["first", "second"]';
+  const obj = parseYAML(yaml);
+  assertEqual(obj.items, ['first', 'second'], 'yaml inline array quoted');
+}
+{
+  const yaml = 'empty: []';
+  const obj = parseYAML(yaml);
+  assertEqual(obj.empty, [], 'yaml inline empty array');
+}
+
+// ── YAML Inline Flow Mapping (v1.1.0 bug fix) ─────────
+console.log('YAML inline flow mapping');
+{
+  const yaml = 'config: {a: 1, b: 2}';
+  const obj = parseYAML(yaml);
+  assertEqual(obj.config, { a: 1, b: 2 }, 'yaml inline map unquoted');
+}
+{
+  const yaml = 'meta: {"x": "y"}';
+  const obj = parseYAML(yaml);
+  assertEqual(obj.meta, { x: 'y' }, 'yaml inline map quoted');
+}
+{
+  const yaml = 'empty: {}';
+  const obj = parseYAML(yaml);
+  assertEqual(obj.empty, {}, 'yaml inline empty map');
+}
+
+// ── YAML Mixed Nested Flow ────────────────────────────
+console.log('YAML nested flow');
+{
+  const yaml = 'servers: [{host: a, port: 1}, {host: b, port: 2}]';
+  const obj = parseYAML(yaml);
+  assertEqual(obj.servers[0].host, 'a', 'yaml nested flow host');
+  assertEqual(obj.servers[1].port, 2, 'yaml nested flow port');
+}
+
 // ── TOML Parsing ──────────────────────────────────────
 console.log('TOML parsing');
 {
@@ -81,6 +130,14 @@ url = "postgres://localhost/mydb"
   assertEqual(obj.debug, false, 'toml bool');
   assertEqual(obj.server.host, '0.0.0.0', 'toml table');
   assertEqual(obj.database.url, 'postgres://localhost/mydb', 'toml table 2');
+}
+
+// ── TOML Dotted Keys ──────────────────────────────────
+console.log('TOML dotted keys');
+{
+  const toml = '[a.b.c]\nkey = 1';
+  const obj = parseTOML(toml);
+  assertEqual(obj.a.b.c.key, 1, 'toml dotted key');
 }
 
 // ── Format Detection ─────────────────────────────────
@@ -157,6 +214,32 @@ console.log('Diff: array changes');
   assertEqual(changes.length, 2, 'two array changes');
 }
 
+// ── Diff: Array Insertion at Beginning ───────────────
+console.log('Diff: array insertion at beginning');
+{
+  const changes = diff([2, 3], [1, 2, 3]);
+  // Positional diff: [2,3] vs [1,2,3] → index 0: 2→1 (changed), index 1: 3→2 (changed), index 2: added (3)
+  assertEqual(changes.length, 3, 'positional diff sees 3 changes');
+  assertEqual(changes[2].type, 'added', 'last element is added');
+}
+
+// ── Diff: Empty Arrays ───────────────────────────────
+console.log('Diff: empty arrays');
+{
+  const changes = diff([], [1, 2]);
+  assertEqual(changes.length, 2, 'two added to empty');
+}
+
+// ── Diff: Nested Objects in Arrays ───────────────────
+console.log('Diff: nested objects in arrays');
+{
+  const a = [{ name: 'old', port: 3000 }];
+  const b = [{ name: 'new', port: 3000 }];
+  const changes = diff(a, b);
+  assertEqual(changes.length, 1, 'one change in array object');
+  assertEqual(changes[0].path.join('.'), '0.name', 'path for array object');
+}
+
 // ── Full Compare: JSON ──────────────────────────────
 console.log('Compare: JSON end-to-end');
 {
@@ -185,6 +268,16 @@ console.log('Compare: JSON vs YAML');
   assertEqual(changes[0].newValue, 3, 'cross-format: b changed to 3');
 }
 
+// ── Compare with Inline YAML Arrays ──────────────────
+console.log('Compare: YAML with inline arrays');
+{
+  const yamlA = 'tags: [a, b, c]';
+  const yamlB = 'tags: [a, b, d]';
+  const changes = compare(yamlA, yamlB, 'yaml', 'yaml');
+  assertEqual(changes.length, 1, 'inline array diff');
+  assertEqual(changes[0].path.join('.'), 'tags.2', 'inline array path');
+}
+
 // ── Output Formatting ───────────────────────────────
 console.log('Output formatting');
 {
@@ -196,7 +289,27 @@ console.log('Output formatting');
 
   const json = formatJSONOutput(changes);
   const parsed = JSON.parse(json);
-  assertEqual(parsed[0].path, 'a', 'json output has path');  // formatPath returns string
+  assertEqual(parsed[0].path, 'a', 'json output has path');
+}
+
+// ── formatPath Tests ─────────────────────────────────
+console.log('formatPath');
+{
+  assertEqual(formatPath(['a', 'b', 'c']), 'a.b.c', 'simple path');
+  assertEqual(formatPath(['a', 0, 'name']), 'a.[0].name', 'array index in path');
+  assertEqual(formatPath([0]), '[0]', 'root array index');
+  assertEqual(formatPath([]), '', 'empty path');
+}
+
+// ── formatValue Tests ────────────────────────────────
+console.log('formatValue');
+{
+  assertEqual(formatValue(null), 'null', 'null value');
+  assertEqual(formatValue('hello'), '"hello"', 'string value');
+  assertEqual(formatValue(42), '42', 'number value');
+  assertEqual(formatValue(true), 'true', 'boolean value');
+  assertEqual(formatValue({ x: 1 }), '{"x":1}', 'object value');
+  assertEqual(formatValue([1, 2]), '[1,2]', 'array value');
 }
 
 // ── Empty Diff Output ───────────────────────────────
@@ -221,6 +334,27 @@ console.log('Null handling');
 {
   const changes = diff({ a: null }, { a: 'hello' });
   assertEqual(changes[0].type, 'type-changed', 'null to string is type change');
+}
+
+// ── Null to Null (no change) ────────────────────────
+console.log('Null to null');
+{
+  const changes = diff({ a: null }, { a: null });
+  assertEqual(changes.length, 0, 'null to null: no change');
+}
+
+// ── Boolean Changes ─────────────────────────────────
+console.log('Boolean changes');
+{
+  const changes = diff({ debug: true }, { debug: false });
+  assertEqual(changes.length, 1, 'boolean changed');
+  assertEqual(changes[0].type, 'changed', 'boolean is changed not type-changed');
+}
+
+// ── Version Export ───────────────────────────────────
+console.log('Version export');
+{
+  assertEqual(VERSION, '1.1.0', 'version string correct');
 }
 
 // ── Summary ─────────────────────────────────────────
