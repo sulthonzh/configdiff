@@ -30,10 +30,19 @@
     "lib/",
     "bin/",
     "README.md",
-    "CHANGELOG.md"
+    "CHANGELOG.md",
+    "LICENSE"
   ],
   "exports": {
     ".": "./lib/diff.js",
     "./package.json": "./package.json"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/sulthonzh/configdiff"
+  },
+  "homepage": "https://github.com/sulthonzh/configdiff#readme",
+  "bugs": {
+    "url": "https://github.com/sulthonzh/configdiff/issues"
   }
 }
