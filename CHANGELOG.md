@@ -1,5 +1,19 @@
 # Changelog
 
+## Unreleased
+
+### Added
+- ESLint flat config (eslint.config.js) with `no-unused-vars`, `prefer-const`, `eqeqeq`, and other quality rules.
+- c8 coverage reporting (`test:coverage` script).
+- `lint` script and `prepublishOnly` now runs both tests and lint.
+
+### Fixed
+- Removed unused `execFileSync` import from `lib/diff.js` (dead code).
+- Removed unused `fs` import from `test/run.js` (ESLint catch).
+
+### Changed
+- `.gitignore` now excludes `coverage/` directory.
+
 ## v1.1.0 — 2026-06-19
 
 ### Fixed

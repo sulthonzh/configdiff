@@ -1,6 +1,5 @@
 'use strict';
 
-const fs = require('fs');
 const { parse, diff, compare, detectFormat, formatHuman, formatJSONOutput, formatPath, formatValue, parseYAML, parseTOML, VERSION } = require('../lib/diff');
 
 let passed = 0;

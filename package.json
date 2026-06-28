@@ -7,9 +7,11 @@
     "configdiff": "./bin/configdiff.js"
   },
   "scripts": {
+    "lint": "eslint lib/ bin/ test/",
     "test": "node test/run.js",
+    "test:coverage": "c8 --all --exclude bin --exclude eslint.config.js --exclude test --exclude node_modules node test/run.js",
     "demo": "node bin/configdiff.js test/fixtures/a.json test/fixtures/b.json",
-    "prepublishOnly": "npm test"
+    "prepublishOnly": "npm test && npm run lint"
   },
   "keywords": [
     "diff",
@@ -44,5 +46,9 @@
   "homepage": "https://github.com/sulthonzh/configdiff#readme",
   "bugs": {
     "url": "https://github.com/sulthonzh/configdiff/issues"
+  },
+  "devDependencies": {
+    "c8": "^10.1.3",
+    "eslint": "^9.39.4"
   }
 }
