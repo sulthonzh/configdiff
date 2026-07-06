@@ -350,6 +350,72 @@ console.log('Boolean changes');
   assertEqual(changes[0].type, 'changed', 'boolean is changed not type-changed');
 }
 
+// ── TOML Array of Tables ────────────────────────────
+console.log('TOML array of tables');
+{
+  const toml = `
+[[servers]]
+name = "alpha"
+port = 3000
+
+[[servers]]
+name = "beta"
+port = 3001
+`;
+  const obj = parseTOML(toml);
+  assertEqual(obj.servers.length, 2, 'toml array of tables length');
+  assertEqual(obj.servers[0].name, 'alpha', 'toml array table[0].name');
+  assertEqual(obj.servers[1].port, 3001, 'toml array table[1].port');
+}
+
+// ── TOML Multi-line Strings ─────────────────────────
+console.log('TOML multi-line strings');
+{
+  const toml = 'description = """hello world"""\n' + "sig = '''single'''";
+  const obj = parseTOML(toml);
+  assertEqual(obj.description, 'hello world', 'toml triple-double string');
+  assertEqual(obj.sig, 'single', 'toml triple-single string');
+}
+
+// ── TOML Array Values ───────────────────────────────
+console.log('TOML array values');
+{
+  const toml = 'ports = [8000, 8001, 8002]';
+  const obj = parseTOML(toml);
+  assertEqual(obj.ports, [8000, 8001, 8002], 'toml array of numbers');
+}
+
+// ── TOML Nested Path Navigation ─────────────────────
+console.log('TOML nested path navigation');
+{
+  const toml = `[a.b]
+key = 1
+
+[a.c]
+key = 2`;
+  const obj = parseTOML(toml);
+  assertEqual(obj.a.b.key, 1, 'toml nested a.b.key');
+  assertEqual(obj.a.c.key, 2, 'toml nested a.c.key');
+}
+
+// ── YAML Flow Mapping Without Colon ─────────────────
+console.log('YAML flow mapping edge cases');
+{
+  // Flow map where item has no colon — should be skipped gracefully
+  const yaml = 'config: {a: 1, nobcolon}';
+  const obj = parseYAML(yaml);
+  assertEqual(obj.config.a, 1, 'yaml flow map partial parse');
+}
+
+// ── Array Element Removal ───────────────────────────
+console.log('Array element removal');
+{
+  const changes = diff([1, 2, 3], [1]);
+  assertEqual(changes.length, 2, 'two elements removed from array');
+  assertEqual(changes[0].type, 'removed', 'first removed');
+  assertEqual(changes[1].type, 'removed', 'second removed');
+}
+
 // ── Version Export ───────────────────────────────────
 console.log('Version export');
 {
