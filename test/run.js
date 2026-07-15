@@ -416,6 +416,54 @@ console.log('Array element removal');
   assertEqual(changes[1].type, 'removed', 'second removed');
 }
 
+// ── YAML Nested List Item with Key and No Value (covers lines 58-61)
+console.log('YAML nested list item with key, no value');
+{
+  // '- key:' with no value pushes a new object scope into an array
+  const yaml = `
+container:
+  - nested:
+      deep: value
+`;
+  const obj = parseYAML(yaml);
+  assertEqual(obj.container.nested.length, 1, 'yaml nested list item: array length');
+  assertEqual(obj.container.nested[0].deep, 'value', 'yaml nested list item: deep value');
+}
+
+// ── YAML List Item Key:Value Without Existing Array (covers lines 72-73)
+console.log('YAML list item key:value creates array');
+{
+  // '- key: value' where parent[key] is not yet an array → creates array, pushes parsed value
+  const yaml = `
+data:
+  - x: 1
+  - x: 2
+`;
+  const obj = parseYAML(yaml);
+  assertEqual(obj.data.x, [1, 2], 'yaml list item key:value builds array');
+}
+
+// ── parseFlowValue Non-Flow Fallback (covers line 113)
+console.log('parseFlowValue non-flow fallback');
+{
+  const { parseFlowValue } = require('../lib/diff');
+  assertEqual(parseFlowValue('hello'), undefined, 'non-flow string returns undefined');
+  assertEqual(parseFlowValue('123'), undefined, 'number string returns undefined');
+}
+
+// ── TOML Float + Bare String Fallback (covers lines 208-209)
+console.log('TOML float and bare string fallback');
+{
+  const toml1 = 'rate = 3.14';
+  const obj1 = parseTOML(toml1);
+  assertEqual(obj1.rate, 3.14, 'toml float parsed');
+
+  // Bare string (not quoted, not number, not bool) — falls through to return val
+  const toml2 = 'host = bare-string';
+  const obj2 = parseTOML(toml2);
+  assertEqual(obj2.host, 'bare-string', 'toml bare string fallback');
+}
+
 // ── Version Export ───────────────────────────────────
 console.log('Version export');
 {

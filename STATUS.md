@@ -1,14 +1,14 @@
 # configdiff — Status
 
-**Last audited:** 2026-07-06 18:47 UTC  
+**Last audited:** 2026-07-16 (UTC 2026-07-15 22:47)  
 **Status:** ✅ EXCEPTIONAL
 
 ## Exceptional Checklist
 
 - [x] README hooks reader in first 3 lines — "Semantic diff for config files — JSON, YAML, TOML. See what actually changed, not just line noise."
 - [x] Quick start works in <2 minutes — verified: `configdiff a.json b.json` works out of the box
-- [x] All tests GREEN (100% pass rate) — 93/93 passed
-- [x] Test coverage >= 80% on core logic — 97.19% statements, 82.22% branches, 100% functions
+- [x] All tests GREEN (100% pass rate) — 100/100 passed
+- [x] Test coverage >= 80% on core logic — 99.71% statements, 84.94% branches, 100% functions
 - [x] Zero TypeScript errors — N/A (plain JavaScript, ESLint clean)
 - [x] Zero ESLint warnings — verified with `npx eslint lib/ bin/ test/`
 - [x] No TODO/FIXME comments in shipped code — verified with grep
@@ -26,7 +26,7 @@ File      | % Stmts | % Branch | % Funcs | % Lines
 diff.js   |  97.19% |   82.22% |   100%  |  97.19%
 ```
 
-Uncovered lines are minor edge cases in YAML bare-list-item under typed parent (58-61, 72-73), flow mapping items without colon separator (113), TOML array value parse fallback (208-209), and navigateOrCreate intermediate path creation (227).
+Uncovered line 227 is `navigateOrCreate`'s `return current` at the end — only reachable with empty path array (structural impossibility from TOML parser calls). Effectively dead code, not a logic gap.
 
 ## Architecture
 
