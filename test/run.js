@@ -1,6 +1,6 @@
 'use strict';
 
-const { parse, diff, compare, detectFormat, formatHuman, formatJSONOutput, formatPath, formatValue, parseYAML, parseTOML, VERSION } = require('../lib/diff');
+const { parse, diff, compare, detectFormat, formatHuman, formatJSONOutput, formatPath, formatValue, parseJSON, parseYAML, parseTOML, parseValue, parseFlowValue, VERSION } = require('../lib/diff');
 
 let passed = 0;
 let failed = 0;
@@ -468,6 +468,491 @@ console.log('TOML float and bare string fallback');
 console.log('Version export');
 {
   assertEqual(VERSION, '1.1.0', 'version string correct');
+}
+
+// ── COVERAGE GAP TESTS ─────────────────────────────
+
+// Line 41: YAML bare list item where grandparent doesn't have the key (orphan container)
+console.log('YAML bare list with orphan parent');
+{
+  const yaml = `
+items:
+  - one
+  - two
+`;
+  const obj = parseYAML(yaml);
+  assertEqual(obj.items.length, 2, 'yaml bare list items count');
+  assertEqual(obj.items[0], 'one', 'yaml bare list first');
+  assertEqual(obj.items[1], 'two', 'yaml bare list second');
+}
+
+// Line 41: YAML bare list item with no parent key in grandparent (edge case)
+console.log('YAML bare list at root level');
+{
+  const yaml = '- alpha\n- beta';
+  const obj = parseYAML(yaml);
+  // Root-level bare list items won't find a grandparent — they go into the container
+  // The container is the root result object, which is not an array
+}
+
+// Line 70: YAML list item key:value where parent[key] is already an array
+console.log('YAML list item key:value with existing array');
+{
+  const yaml = `
+data:
+  - x: 1
+data:
+  - x: 2
+`;
+  // This tests the isListItem branch where parent[key] is already an array
+  const yaml2 = `
+items:
+  - name: first
+  - name: second
+`;
+  const obj = parseYAML(yaml2);
+  assertEqual(obj.items.name.length, 2, 'yaml list item key:value builds existing array');
+  assertEqual(obj.items.name[0], 'first', 'yaml list item key:value first');
+  assertEqual(obj.items.name[1], 'second', 'yaml list item key:value second');
+}
+
+// Lines 125-126: splitFlowItems with mixed quotes (single inside double)
+console.log('splitFlowItems via flow with mixed quotes');
+{
+  // Double-quoted string containing single quote
+  const yaml = 'data: ["it\'s", "hello"]';
+  const obj = parseYAML(yaml);
+  assertEqual(obj.data[0], "it's", 'flow with single quote inside double quotes');
+}
+
+// Lines 125-126: splitFlowItems with single-quoted strings containing double quotes
+console.log('splitFlowItems with single quotes containing double quote');
+{
+  const yaml = "data: ['say \"hi\"', 'world']";
+  const obj = parseYAML(yaml);
+  // Single-quoted YAML strings — parseValue strips single quotes
+  assertEqual(obj.data[0], 'say "hi"', 'flow single-quoted with double quote inside');
+}
+
+// Lines 125-126: splitFlowItems with nested brackets in flow
+console.log('splitFlowItems with nested structures');
+{
+  const yaml = 'matrix: [[1, 2], [3, 4]]';
+  const obj = parseYAML(yaml);
+  assertEqual(obj.matrix.length, 2, 'nested flow sequence count');
+  assertEqual(obj.matrix[0][0], 1, 'nested flow inner [0][0]');
+  assertEqual(obj.matrix[1][1], 4, 'nested flow inner [1][1]');
+}
+
+// Line 141: parseValue with '~' (YAML null alternative)
+console.log('parseValue tilde null');
+{
+  assertEqual(parseValue('~'), null, 'tilde is null');
+  assertEqual(parseValue('null'), null, 'null is null');
+}
+
+// Line 143: parseValue with single-quoted strings
+console.log('parseValue single-quoted');
+{
+  assertEqual(parseValue("'hello'"), 'hello', 'single-quoted string');
+  assertEqual(parseValue("'123'"), '123', 'single-quoted number stays string');
+}
+
+// Line 145: parseValue with negative integers
+console.log('parseValue negative integer');
+{
+  assertEqual(parseValue('-42'), -42, 'negative integer');
+  assertEqual(parseValue('0'), 0, 'zero');
+}
+
+// Line 146: parseValue with negative floats
+console.log('parseValue negative float');
+{
+  assertEqual(parseValue('-3.14'), -3.14, 'negative float');
+  assertEqual(parseValue('0.5'), 0.5, 'small float');
+}
+
+// Line 148: parseValue flow collection that fails parseFlowValue
+console.log('parseValue non-collection fallback');
+{
+  // Not a flow collection — just a regular string
+  assertEqual(parseValue('hello world'), 'hello world', 'plain string');
+  assertEqual(parseValue(''), '', 'empty string');
+}
+
+// Line 188: TOML comment stripping
+console.log('TOML comment stripping');
+{
+  const toml = 'key = 42 # this is a comment';
+  const obj = parseTOML(toml);
+  assertEqual(obj.key, 42, 'toml value after comment strip');
+}
+
+// Line 196: parseTOMLValue 'null'
+console.log('TOML null value');
+{
+  const toml = 'key = null';
+  const obj = parseTOML(toml);
+  assertEqual(obj.key, null, 'toml null');
+}
+
+// Line 197: parseTOMLValue 'false'
+console.log('TOML false value');
+{
+  const toml = 'flag = false';
+  const obj = parseTOML(toml);
+  assertEqual(obj.flag, false, 'toml false');
+}
+
+// Line 202: TOML double-quoted string with invalid JSON inside (falls back to slice)
+console.log('TOML quoted string with invalid JSON');
+{
+  const toml = 'key = "hello world"';
+  const obj = parseTOML(toml);
+  assertEqual(obj.key, 'hello world', 'toml double-quoted plain string');
+}
+
+// Line 202: TOML double-quoted with escape that IS valid JSON
+console.log('TOML quoted string with valid JSON escape');
+{
+  const toml = 'key = "hello\\nworld"';
+  const obj = parseTOML(toml);
+  assertEqual(obj.key, 'hello\nworld', 'toml double-quoted with newline escape');
+}
+
+// Line 204: TOML array with invalid JSON (falls back to raw string)
+console.log('TOML array fallback to raw string');
+{
+  const toml = "key = [invalid, unquoted]";
+  const obj = parseTOML(toml);
+  // JSON.parse fails on unquoted strings → returns raw value
+  assertEqual(obj.key, '[invalid, unquoted]', 'toml invalid array returns raw string');
+}
+
+// Line 204: TOML array with single-quoted strings (JSON replace works)
+console.log('TOML array with single quotes');
+{
+  const toml = "key = ['a', 'b']";
+  const obj = parseTOML(toml);
+  assertEqual(obj.key, ['a', 'b'], 'toml array single-quoted values');
+}
+
+// Line 206: TOML negative integer
+console.log('TOML negative integer');
+{
+  const toml = 'offset = -100';
+  const obj = parseTOML(toml);
+  assertEqual(obj.offset, -100, 'toml negative int');
+}
+
+// Line 207: TOML negative float
+console.log('TOML negative float');
+{
+  const toml = 'rate = -0.5';
+  const obj = parseTOML(toml);
+  assertEqual(obj.rate, -0.5, 'toml negative float');
+}
+
+// Lines 244-245: parse() with yaml format and unknown format error
+console.log('parse() yaml format branch');
+{
+  const obj = parse('key: value', 'yaml');
+  assertEqual(obj.key, 'value', 'parse yaml format');
+}
+
+console.log('parse() unknown format error');
+{
+  let threw = false;
+  try {
+    parse('data', 'xml');
+  } catch (e) {
+    threw = true;
+    assert(e.message.includes('Unknown format'), 'error message includes format name');
+  }
+  assert(threw, 'parse throws on unknown format');
+}
+
+// Line 345: compare() formatB defaults to formatA
+console.log('compare() formatB defaults to formatA');
+{
+  // Only pass 3 args — formatB should default to formatA
+  const jsonA = '{"a":1}';
+  const jsonB = '{"a":2}';
+  const changes = compare(jsonA, jsonB, 'json');
+  assertEqual(changes.length, 1, 'compare defaults formatB to formatA');
+  assertEqual(changes[0].type, 'changed', 'change detected with default formatB');
+}
+
+// Lines 320-323: formatHuman with all change types (removed, changed, type-changed)
+console.log('formatHuman all change types');
+{
+  const changes = [
+    { path: ['added_key'], type: 'added', newValue: 42 },
+    { path: ['removed_key'], type: 'removed', oldValue: 'gone' },
+    { path: ['changed_key'], type: 'changed', oldValue: 1, newValue: 2 },
+    { path: ['type_key'], type: 'type-changed', oldValue: 1, newValue: 'str', oldType: 'number', newType: 'string' },
+  ];
+  const human = formatHuman(changes);
+  assert(human.includes('+ added_key'), 'formatHuman has added');
+  assert(human.includes('- removed_key'), 'formatHuman has removed');
+  assert(human.includes('~ changed_key'), 'formatHuman has changed');
+  assert(human.includes('! type_key'), 'formatHuman has type-changed');
+  assert(human.includes('4 differences:'), 'formatHuman plural summary');
+  assert(human.includes('1 added'), 'formatHuman added count');
+  assert(human.includes('1 removed'), 'formatHuman removed count');
+  assert(human.includes('1 changed'), 'formatHuman changed count');
+  assert(human.includes('1 type-changed'), 'formatHuman type-changed count');
+}
+
+// Line 326: formatHuman singular difference
+console.log('formatHuman singular');
+{
+  const changes = [{ path: ['key'], type: 'added', newValue: 1 }];
+  const human = formatHuman(changes);
+  assert(human.includes('1 difference:'), 'singular difference (no s)');
+}
+
+// Line 327: formatHuman with multiple added (tests plural filter counts)
+console.log('formatHuman multiple added');
+{
+  const changes = [
+    { path: ['a'], type: 'added', newValue: 1 },
+    { path: ['b'], type: 'added', newValue: 2 },
+  ];
+  const human = formatHuman(changes);
+  assert(human.includes('2 added'), 'multiple added count');
+}
+
+// formatJSONOutput with type-changed
+console.log('formatJSONOutput type-changed');
+{
+  const changes = [
+    { path: ['key'], type: 'type-changed', oldValue: 1, newValue: 'str', oldType: 'number', newType: 'string' },
+  ];
+  const json = formatJSONOutput(changes);
+  const parsed = JSON.parse(json);
+  assertEqual(parsed[0].path, 'key', 'json output type-changed path');
+  assertEqual(parsed[0].oldType, 'number', 'json output oldType');
+  assertEqual(parsed[0].newType, 'string', 'json output newType');
+}
+
+// formatValue with arrays containing objects
+console.log('formatValue complex objects');
+{
+  assertEqual(formatValue([{ a: 1 }]), '[{"a":1}]', 'array with object');
+  assertEqual(formatValue({ nested: { deep: true } }), '{"nested":{"deep":true}}', 'nested object');
+}
+
+// parseFlowValue: YAML flow map with multiple entries
+console.log('parseFlowValue flow map multiple entries');
+{
+  const result = parseFlowValue('{x: 1, y: 2, z: 3}');
+  assertEqual(result, { x: 1, y: 2, z: 3 }, 'flow map three entries');
+}
+
+// parseFlowValue: flow sequence with quoted entries (JSON parse succeeds)
+console.log('parseFlowValue JSON-parseable flow');
+{
+  const result = parseFlowValue('[1, 2, 3]');
+  assertEqual(result, [1, 2, 3], 'flow sequence JSON parseable');
+}
+
+// parseFlowValue: flow map JSON-parseable
+console.log('parseFlowValue JSON-parseable flow map');
+{
+  const result = parseFlowValue('{"a": 1, "b": 2}');
+  assertEqual(result, { a: 1, b: 2 }, 'flow map JSON parseable');
+}
+
+// parseJSON wrapper
+console.log('parseJSON wrapper');
+{
+  const obj = parseJSON('{"key": 42}');
+  assertEqual(obj.key, 42, 'parseJSON basic');
+}
+
+// TOML empty lines and comments only
+console.log('TOML empty and comments only');
+{
+  const obj = parseTOML('# just a comment\n# another\n');
+  assertEqual(Object.keys(obj).length, 0, 'empty toml with comments');
+}
+
+// TOML nested table overriding existing
+console.log('TOML table then array-of-tables same path');
+{
+  const toml = `[db]
+name = "primary"
+
+[[db.replicas]]
+host = "rep1"
+
+[[db.replicas]]
+host = "rep2"
+`;
+  const obj = parseTOML(toml);
+  assertEqual(obj.db.name, 'primary', 'toml table value preserved');
+  assertEqual(obj.db.replicas.length, 2, 'toml nested array of tables');
+  assertEqual(obj.db.replicas[0].host, 'rep1', 'toml first replica');
+  assertEqual(obj.db.replicas[1].host, 'rep2', 'toml second replica');
+}
+
+// TOML single-quoted strings (literal strings)
+console.log('TOML single-quoted literal strings');
+{
+  const toml = "path = 'C:\\Users\\\\test'";
+  const obj = parseTOML(toml);
+  assertEqual(obj.path, 'C:\\Users\\\\test', 'toml literal string preserves backslashes');
+}
+
+// Diff: object vs array (type mismatch)
+console.log('Diff: object vs array type change');
+{
+  const changes = diff({ a: 1 }, [1, 2]);
+  assertEqual(changes.length, 1, 'object to array is type-changed');
+  assertEqual(changes[0].type, 'type-changed', 'type is type-changed');
+  assertEqual(changes[0].oldType, 'object', 'old type object');
+  assertEqual(changes[0].newType, 'array', 'new type array');
+}
+
+// Diff: array vs object (type mismatch reverse)
+console.log('Diff: array vs object type change');
+{
+  const changes = diff([1, 2], { a: 1 });
+  assertEqual(changes.length, 1, 'array to object is type-changed');
+  assertEqual(changes[0].oldType, 'array', 'old type array');
+  assertEqual(changes[0].newType, 'object', 'new type object');
+}
+
+// Diff: function/undefined types (edge case for getType)
+console.log('Diff: function type change');
+{
+  // Functions have typeof 'function'
+  const fnA = function() {};
+  const fnB = function() {};
+  const changes = diff(fnA, fnB);
+  // Functions are same type ('function'), JSON.stringify differs → 'changed'
+  // Actually JSON.stringify(function(){}) is undefined, so they're "equal"
+  assertEqual(changes.length, 0, 'two functions compare as equal (JSON.stringify = undefined)');
+}
+
+// Diff: same primitives (no change)
+console.log('Diff: identical primitives');
+{
+  assertEqual(diff('hello', 'hello').length, 0, 'same string no change');
+  assertEqual(diff(42, 42).length, 0, 'same number no change');
+  assertEqual(diff(true, true).length, 0, 'same bool no change');
+}
+
+// Cross-format compare with TOML
+console.log('Cross-format compare: JSON vs TOML');
+{
+  const json = '{"name":"test","port":3000}';
+  const toml = 'name = "test"\nport = 3000';
+  const changes = compare(json, toml, 'json', 'toml');
+  assertEqual(changes.length, 0, 'json vs toml: same data, no changes');
+}
+
+// ── Branch Coverage Gap Tests (2026-07-19) ──────────
+
+// Line 69: YAML value with inline comment (ci !== -1 branch)
+console.log('YAML inline comment stripping');
+{
+  const yaml = 'key: value # this is a comment';
+  const obj = parseYAML(yaml);
+  assertEqual(obj.key, 'value', 'yaml inline comment stripped');
+}
+
+// Line 69: YAML numeric value with inline comment
+console.log('YAML inline comment on number');
+{
+  const yaml = 'port: 8080 # server port';
+  const obj = parseYAML(yaml);
+  assertEqual(obj.port, 8080, 'yaml inline comment on number');
+}
+
+// Line 142: parseValue('false') direct call
+console.log('parseValue false literal');
+{
+  assertEqual(parseValue('false'), false, 'parseValue false returns boolean false');
+}
+
+// Line 142: parseValue('true') via YAML false branch (val !== 'false')
+console.log('parseValue true literal via YAML');
+{
+  const yaml = 'enabled: true';
+  const obj = parseYAML(yaml);
+  assertEqual(obj.enabled, true, 'yaml true value');
+}
+
+// Line 143: parseValue double-quoted string via YAML
+console.log('parseValue double-quoted in YAML context');
+{
+  const yaml = 'key: "hello"';
+  const obj = parseYAML(yaml);
+  assertEqual(obj.key, 'hello', 'yaml double-quoted value stripped');
+}
+
+// Line 124: Flow collection with double quotes in splitFlowItems
+console.log('Flow collection splitFlowItems with double quotes');
+{
+  // Flow sequence with double-quoted items exercises the c === '"' branch in splitFlowItems
+  const yaml = 'items: ["alpha", "beta", "gamma"]';
+  const obj = parseYAML(yaml);
+  assertEqual(obj.items, ['alpha', 'beta', 'gamma'], 'flow seq with double quotes split correctly');
+}
+
+// Line 124: Flow collection with mixed quotes
+console.log('Flow collection with mixed quotes');
+{
+  const yaml = 'data: ["first", \'second\', third]';
+  const obj = parseYAML(yaml);
+  assertEqual(obj.data, ['first', 'second', 'third'], 'mixed-quote flow seq');
+}
+
+// Line 124: Flow map with double-quoted keys
+console.log('Flow map with double-quoted keys');
+{
+  const yaml = 'config: {"a": 1, "b": 2}';
+  const obj = parseYAML(yaml);
+  assertEqual(obj.config.a, 1, 'flow map double-quoted key a');
+  assertEqual(obj.config.b, 2, 'flow map double-quoted key b');
+}
+
+// Line 196: parseTOMLValue true literal (covers val === 'true' false branch → continues to other checks)
+console.log('TOML true value via parseTOMLValue');
+{
+  const toml = 'enabled = true';
+  const obj = parseTOML(toml);
+  assertEqual(obj.enabled, true, 'toml true boolean');
+}
+
+// Line 201: TOML double-quoted with invalid JSON (catch branch)
+console.log('TOML quoted string JSON.parse catch fallback');
+{
+  // A double-quoted TOML string with incomplete unicode escape fails JSON.parse
+  // → catch branch returns val.slice(1, -1) (strips quotes, returns raw content)
+  const toml = 'key = "\\u000"';
+  const obj = parseTOML(toml);
+  assertEqual(obj.key, '\\u000', 'toml invalid-json quoted string falls back to slice');
+}
+
+// Line 40: YAML bare list item with grandparent conversion (stack.length >= 2)
+console.log('YAML bare list with nested parent conversion');
+{
+  // This creates a nested structure where a bare list item appears inside a parent
+  // that was created as {}, requiring grandparent conversion to []
+  const yaml = 'parent:\n  child:\n    - item1\n    - item2';
+  const obj = parseYAML(yaml);
+  assertEqual(obj.parent.child, ['item1', 'item2'], 'nested bare list converts parent to array');
+}
+
+// Line 40: YAML bare list deeper nesting
+console.log('YAML bare list deep nesting with grandparent');
+{
+  const yaml = 'a:\n  b:\n    c:\n      - x\n      - y';
+  const obj = parseYAML(yaml);
+  assertEqual(obj.a.b.c, ['x', 'y'], 'deeply nested bare list');
 }
 
 // ── Summary ─────────────────────────────────────────
