@@ -1,6 +1,7 @@
 # configdiff — Status
 
-**Last audited:** 2026-07-19 (UTC 2026-07-18 16:47)  
+**Last audited:** 2026-08-01 (UTC 2026-08-01 17:57)
+**Prior audit:** 2026-07-19 (UTC 2026-07-18 16:47)
 **Status:** ✅ EXCEPTIONAL
 
 ## Exceptional Checklist
@@ -10,7 +11,7 @@
 - [x] All tests GREEN (100% pass rate) — 186/186 passed
 - [x] Test coverage >= 80% on core logic — 99.71% statements, 99.01% branches, 100% functions
 - [x] Zero TypeScript errors — N/A (plain JavaScript, ESLint clean)
-- [x] Zero ESLint warnings — verified with `npx eslint lib/ bin/ test/`
+- [x] Zero ESLint warnings — verified with `npx eslint lib/ bin/ test/` (fixed 2 unused-var errors in test/run.js this cycle)
 - [x] No TODO/FIXME comments in shipped code — verified with grep
 - [x] At least 3 real-world examples in docs — Helm Values Review, CI Gate for Config Changes, Dependency Config Audit
 - [x] CHANGELOG up to date — v1.0.0 → v1.1.0, plus Unreleased section

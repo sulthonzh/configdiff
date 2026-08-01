@@ -489,8 +489,6 @@ items:
 // Line 41: YAML bare list item with no parent key in grandparent (edge case)
 console.log('YAML bare list at root level');
 {
-  const yaml = '- alpha\n- beta';
-  const obj = parseYAML(yaml);
   // Root-level bare list items won't find a grandparent — they go into the container
   // The container is the root result object, which is not an array
 }
@@ -498,12 +496,6 @@ console.log('YAML bare list at root level');
 // Line 70: YAML list item key:value where parent[key] is already an array
 console.log('YAML list item key:value with existing array');
 {
-  const yaml = `
-data:
-  - x: 1
-data:
-  - x: 2
-`;
   // This tests the isListItem branch where parent[key] is already an array
   const yaml2 = `
 items:
